@@ -110,6 +110,15 @@ ffmpeg 已经安装并在 PATH 中
 }
 ```
 
+错误示例2（bad request）：
+```json
+{
+	"ok": false,
+	"error": "cannot parse your request",
+	"result": {}
+}
+```
+
 ### 编码任务
 
 一个视频，每个分辨率方案对应一个编码任务。

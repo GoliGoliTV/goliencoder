@@ -22,7 +22,7 @@ type config struct {
 	WorkingDirectory string   `json:"work_dir"`
 	Cuncurrent       int      `json:"concurrent"`
 	VideoCodec       string   `json:"vcodec"`
-	VideoCRF         string   `json:"vcrf"`
+	VideoCRF         int      `json:"vcrf"`
 	CodecPreset      string   `json:"preset"`
 	VProfile         string   `json:"vprofile"`
 	AudioCodec       string   `json:"acodec"`
@@ -57,10 +57,10 @@ type StreamInFile struct {
 
 // VideoInfo video information struct
 type VideoInfo struct {
-	Duration   string         `json:"duration"`
-	Bitrate    string         `json:"bitrate"`
+	Duration   string         `json:"duration,omitempty"`
+	Bitrate    string         `json:"bitrate,omitempty"`
 	Resolution string         `json:"resolution,omitempty"`
-	Streams    []StreamInFile `json:"streams"`
+	Streams    []StreamInFile `json:"streams,omitempty"`
 }
 
 // GetAspectRatio calculate aspect ratio fo this video
@@ -233,7 +233,7 @@ func main() {
 				cmd := exec.Command("ffmpeg",
 					"-i", task.InputFile,
 					"-c:v", cfg.VideoCodec,
-					"-crf", cfg.VideoCRF,
+					"-crf", string(cfg.VideoCRF),
 					"-preset", cfg.CodecPreset,
 					"-profile:v", cfg.VProfile,
 					"-c:a", cfg.AudioCodec,
@@ -269,10 +269,15 @@ func main() {
 		}
 		var req apiRequest
 		var res apiResponse
-		err = json.Unmarshal(requestBody, req)
+		err = json.Unmarshal(requestBody, &req)
 		if err != nil {
 			w.WriteHeader(400)
 			w.Write(apiErrorResponse("cannot parse your request"))
+			return
+		}
+		_, err = os.Stat(path.Join(cfg.WorkingDirectory, req.Video))
+		if err != nil {
+			w.Write(apiErrorResponse("can not stat file: " + err.Error()))
 			return
 		}
 		vi, err := probeVideo(path.Join(cfg.WorkingDirectory, req.Video))
@@ -303,4 +308,9 @@ func main() {
 		}
 		return
 	})
+	err = http.ListenAndServe(cfg.ListenAddress, nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(4)
+	}
 }
