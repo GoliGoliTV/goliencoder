@@ -6,46 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
-	"regexp"
-	"strconv"
-	"strings"
 )
-
-type config struct {
-	ListenAddress    string   `json:"listen"`
-	CallbackURL      string   `json:"callback"`
-	WorkingDirectory string   `json:"work_dir"`
-	Cuncurrent       int      `json:"concurrent"`
-	VideoCodec       string   `json:"vcodec"`
-	VideoCRF         int      `json:"vcrf"`
-	CodecPreset      string   `json:"preset"`
-	VProfile         string   `json:"vprofile"`
-	AudioCodec       string   `json:"acodec"`
-	Resolutions      []string `json:"resolutions"`
-	MinResolution    string   `json:"min_res"`
-	MaxAspectRatio   float32  `json:"asr_max"`
-	MinAspectRatio   float32  `json:"asr_min"`
-	EnableLog        bool     `json:"-"`
-}
-
-func parseResolution(r string) (w, h int, err error) {
-	sa := strings.Split(r, "x")
-	wi, err := strconv.ParseInt(sa[0], 10, 32)
-	if err != nil {
-		return
-	}
-	he, err := strconv.ParseInt(sa[1], 10, 32)
-	if err != nil {
-		return
-	}
-	w, h = int(wi), int(he)
-	return
-}
 
 // StreamInFile store stream info read from ffprobe
 // Type: Audio|Video|Data
@@ -110,55 +75,26 @@ type callbackRequest struct {
 
 type encodeTask struct {
 	InputFile  string
-	Resolution string
+	Args       []string
 	OutputFile string
+	Resolution string
 }
 
-func calculateResolution(ow, oh, tw, th int) (rw, rh int) {
-	if ow <= tw && oh <= th {
-		rw, rh = ow, oh
-		return
-	}
-	if ow > tw {
-		oh = oh * tw / ow
-		if oh%2 != 0 {
-			oh = oh + 1
-		}
-		ow = tw
-	}
-	if oh > th {
-		ow = ow * th / oh
-		if ow%2 != 0 {
-			ow = ow + 1
-		}
-		oh = th
-	}
-	tar := float64(tw) / float64(th)
-	oar := float64(ow) / float64(oh)
-	ras := math.Abs(tar - oar)
-	if ras < 0.1 {
-		rw, rh = tw, th
-		return
-	}
-	rw, rh = ow, oh
-	return
-}
-
-func generateTasks(width, height int, resolutions []string, inFile string) (ts []encodeTask) {
-	for _, r := range resolutions {
-		tw, th, e := parseResolution(r)
+func generateTasks(width, height int, modes []encodeMode, inFile string, defaultArgs []string) (ts []encodeTask) {
+	for _, m := range modes {
+		tw, th, e := parseResolution(m.Resolution)
 		if e != nil {
 			continue
 		}
 		if width > tw || height > th {
 			rw, rh := calculateResolution(width, height, tw, th)
 			outFile := inFile[:len(inFile)-len(path.Ext(inFile))] + fmt.Sprintf("_%dp.mp4", th)
-			ts = append(ts, encodeTask{inFile, fmt.Sprintf("%dx%d", rw, rh), outFile})
+			ts = append(ts, encodeTask{inFile, ffargs(inFile, outFile, rw, rh, m.FFMpegArgs), outFile, m.Resolution})
 		}
 	}
 	if len(ts) == 0 {
 		outFile := inFile[:len(inFile)-len(path.Ext(inFile))] + "_orgi.mp4"
-		ts = append(ts, encodeTask{inFile, fmt.Sprintf("%dx%d", width, height), outFile})
+		ts = append(ts, encodeTask{inFile, ffargs(inFile, outFile, width, height, defaultArgs), outFile, "orgi"})
 	}
 	return
 }
@@ -168,55 +104,15 @@ func apiErrorResponse(info string) (b []byte) {
 	return
 }
 
-func probeVideo(videoPath string) (vi VideoInfo, err error) {
-	cmd := exec.Command("ffprobe", "-i", videoPath)
-	reg, _ := regexp.Compile(`^Stream (#\d+:\d+).*: (?:(Audio): (\w+).+?|(Video): (\w+).+?, (\d+x\d+)[, \[])`)
-	probeBuffer, err := cmd.CombinedOutput()
-	if err != nil {
-		return
-	}
-	sl := strings.Split(string(probeBuffer), "\n")
-	for _, s := range sl {
-		data := strings.TrimSpace(s)
-		var da []string
-		if strings.HasPrefix(data, "Duration:") {
-			da = strings.Split(data, ", ")
-			if len(da) != 3 {
-				continue
-			}
-			vi.Duration = da[0][10:]
-			vi.Bitrate = da[2][9:]
-		} else if strings.HasPrefix(data, "Stream #") {
-			mresult := reg.FindStringSubmatch(data)
-			if len(mresult) == 0 {
-				continue
-			}
-			if mresult[2] == "Audio" {
-				vi.Streams = append(vi.Streams, StreamInFile{mresult[1], mresult[2], mresult[3]})
-			} else if mresult[4] == "Video" {
-				vi.Resolution = mresult[6]
-				vi.Streams = append(vi.Streams, StreamInFile{mresult[1], mresult[4], mresult[5]})
-			}
-		}
-	}
-	return
-}
-
 func main() {
 	var configPath = flag.String("c", "config.json", "config file path")
 	var printHelp = flag.Bool("h", false, "print this help")
-	var cfg config
 	flag.Parse()
 	if *printHelp {
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
-	configBuffer, err := ioutil.ReadFile(*configPath)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	err = json.Unmarshal(configBuffer, &cfg)
+	cfg, err := loadConfigJSON(*configPath)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
@@ -230,15 +126,7 @@ func main() {
 			task := <-tasks
 			go func(task encodeTask) {
 				var tr callbackRequest
-				cmd := exec.Command("ffmpeg",
-					"-i", task.InputFile,
-					"-c:v", cfg.VideoCodec,
-					"-crf", strconv.Itoa(cfg.VideoCRF),
-					"-preset", cfg.CodecPreset,
-					"-profile:v", cfg.VProfile,
-					"-c:a", cfg.AudioCodec,
-					"-s:v", task.Resolution,
-					task.OutputFile)
+				cmd := exec.Command("ffmpeg", task.Args...)
 				cmd.Dir = cfg.WorkingDirectory
 				err := cmd.Run()
 				tr.OriginFile = task.InputFile
@@ -303,7 +191,7 @@ func main() {
 		w.Write(resBuffer)
 		if res.Ok {
 			go func(w, h int, v string) {
-				for _, t := range generateTasks(w, h, cfg.Resolutions, v) {
+				for _, t := range generateTasks(w, h, cfg.Modes, v, cfg.FFArgs) {
 					tasks <- t
 				}
 			}(videoWidth, videoHeight, req.Video)

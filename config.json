@@ -3,12 +3,49 @@
 	"callback": "http://127.0.0.1:1708/",
 	"work_dir": "/tmp/goliencoder",
 	"concurrent": 1,
-	"vcodec": "libx264",
-	"acodec": "aac",
-	"vcrf": 20,
-	"preset": "slow",
-	"vprofile": "high",
-	"resolutions": ["640x360", "854x480", "1280x720"],
+	"defaultargs": [
+		"-c:v", "hevc",
+		"-crf", "20",
+		"-preset", "veryslow",
+		"-profile:v", "high",
+		"-level", "4.2",
+		"-c:a", "aac"
+	],
+	"modes": [
+		{
+			"resolution": "640x360",
+			"ffargs": [
+				"-c:v", "h264",
+				"-crf", "20",
+				"-preset", "veryslow",
+				"-profile:v", "high",
+				"-level", "4.2",
+				"-c:a", "aac"
+			]
+		},
+		{
+			"resolution": "854x480",
+			"ffargs": [
+				"-c:v", "h264",
+				"-crf", "22",
+				"-preset", "veryslow",
+				"-profile:v", "high",
+				"-level", "4.2",
+				"-c:a", "aac"
+			]
+		},
+		{
+			"resolution": "1280x720",
+			"ffargs": [
+				"-c:v", "h264",
+				"-crf", "23",
+				"-preset", "slow",
+				"-profile:v", "high",
+				"-level", "4.2",
+				"-c:a", "aac"
+			]
+		}
+	],
 	"min_res": "128x96",
 	"asr_max": 3.0,
 	"asr_min": 0.5
