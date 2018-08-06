@@ -233,7 +233,7 @@ func main() {
 				cmd := exec.Command("ffmpeg",
 					"-i", task.InputFile,
 					"-c:v", cfg.VideoCodec,
-					"-crf", string(cfg.VideoCRF),
+					"-crf", strconv.Itoa(cfg.VideoCRF),
 					"-preset", cfg.CodecPreset,
 					"-profile:v", cfg.VProfile,
 					"-c:a", cfg.AudioCodec,
@@ -294,17 +294,19 @@ func main() {
 		} else {
 			res.Ok = true
 		}
-		resBuffer, _ := json.Marshal(res)
-		w.Write(resBuffer)
 		videoWidth, videoHeight, err := parseResolution(vi.Resolution)
 		if err != nil {
 			res.Ok = false
 			res.ErrorInfo = "can not parse video resolution, maybe not a video file"
 		}
+		resBuffer, _ := json.Marshal(res)
+		w.Write(resBuffer)
 		if res.Ok {
-			for _, v := range generateTasks(videoWidth, videoHeight, cfg.Resolutions, req.Video) {
-				tasks <- v
-			}
+			go func(w, h int, v string) {
+				for _, t := range generateTasks(w, h, cfg.Resolutions, v) {
+					tasks <- t
+				}
+			}(videoWidth, videoHeight, req.Video)
 		}
 		return
 	})

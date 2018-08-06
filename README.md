@@ -2,8 +2,6 @@
 
 本模块用于用户视频编码
 
-**本程序尚未经过任何测试**
-
 **本程序尚未完成开发**
 
 ### 运行
@@ -110,11 +108,11 @@ ffmpeg 已经安装并在 PATH 中
 }
 ```
 
-错误示例2（bad request）：
+错误示例2：
 ```json
 {
 	"ok": false,
-	"error": "cannot parse your request",
+	"error": "can not stat file: stat /tmp/goliencoder/xyz: no such file or directory",
 	"result": {}
 }
 ```
