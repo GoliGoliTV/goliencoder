@@ -47,12 +47,15 @@ func parseResolution(r string) (w, h int, err error) {
 	return
 }
 
+// StreamInFile store stream info read from ffprobe
+// Type: Audio|Video|Data
 type StreamInFile struct {
 	Channel string `json:"channel"`
 	Type    string `json:"type"`
 	Codec   string `json:"codec"`
 }
 
+// VideoInfo video information struct
 type VideoInfo struct {
 	Duration   string         `json:"duration"`
 	Bitrate    string         `json:"bitrate"`
@@ -60,6 +63,7 @@ type VideoInfo struct {
 	Streams    []StreamInFile `json:"streams"`
 }
 
+// GetAspectRatio calculate aspect ratio fo this video
 func (v *VideoInfo) GetAspectRatio() (ar float32, w int, h int) {
 	w, h, e := parseResolution(v.Resolution)
 	if e != nil {
@@ -73,6 +77,8 @@ func (v *VideoInfo) GetAspectRatio() (ar float32, w int, h int) {
 	return
 }
 
+// CheckAspectRatio checks aspect ratio, and the resolution size
+// amin: MinAspectRatio, amax: MaxAspectRatio, wmin: MinWidth, hmin: MinHeight
 func (v *VideoInfo) CheckAspectRatio(amin, amax float32, wmin, hmin int) int {
 	vr, w, h := v.GetAspectRatio()
 	if w < wmin || h < hmin {
@@ -233,6 +239,7 @@ func main() {
 					"-c:a", cfg.AudioCodec,
 					"-s:v", task.Resolution,
 					task.OutputFile)
+				cmd.Dir = cfg.WorkingDirectory
 				err := cmd.Run()
 				tr.OriginFile = task.InputFile
 				tr.OutputFile = task.OutputFile
@@ -284,8 +291,15 @@ func main() {
 		}
 		resBuffer, _ := json.Marshal(res)
 		w.Write(resBuffer)
+		videoWidth, videoHeight, err := parseResolution(vi.Resolution)
+		if err != nil {
+			res.Ok = false
+			res.ErrorInfo = "can not parse video resolution, maybe not a video file"
+		}
 		if res.Ok {
-
+			for _, v := range generateTasks(videoWidth, videoHeight, cfg.Resolutions, req.Video) {
+				tasks <- v
+			}
 		}
 		return
 	})
