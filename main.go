@@ -143,6 +143,8 @@ func main() {
 				if err == nil {
 					ioutil.ReadAll(resp.Body)
 					resp.Body.Close()
+				} else {
+					fmt.Println("cannot send request to callback address:", err)
 				}
 				<-concurrentCounter
 			}(task)
