@@ -2,16 +2,17 @@
 
 本模块用于用户视频编码
 
-**本程序尚未完成开发**
+**随着其他项目及模块的开发，本程序的功能及 API 规范可能会有较大变化**
 
 ### 运行
 
 #### 运行要求
 
-ffmpeg 已经安装并在 PATH 中
+ffmpeg ffprobe 已经安装并在 PATH 中
 
 ```bash
-/path/to/bin/goliencoder -c /path/to/config.json
+go get -u github.com/GoliGoliTV/goliencoder
+goliencoder -c /path/to/config.json
 ```
 
 ### 配置文件
@@ -23,17 +24,21 @@ ffmpeg 已经安装并在 PATH 中
 	"callback": "http://127.0.0.1:1708/",
 	"work_dir": "/tmp/goliencoder",
 	"concurrent": 1,
-	"defaultargs": [
-		"-c:v", "hevc",
-		"-crf", "20",
-		"-preset", "veryslow",
-		"-profile:v", "high",
-		"-level", "4.2",
-		"-c:a", "aac"
-	],
+	"default_mode": {
+		"file_ext": ".mp4",
+		"ffargs": [
+			"-c:v", "hevc",
+			"-crf", "20",
+			"-preset", "veryslow",
+			"-profile:v", "high",
+			"-level", "4.2",
+			"-c:a", "aac"
+		]
+	},
 	"modes": [
 		{
 			"resolution": "640x360",
+			"file_ext": ".mp4",
 			"ffargs": [
 				"-c:v", "h264",
 				"-crf", "20",
@@ -45,6 +50,7 @@ ffmpeg 已经安装并在 PATH 中
 		},
 		{
 			"resolution": "854x480",
+			"file_ext": ".mp4",
 			"ffargs": [
 				"-c:v", "h264",
 				"-crf", "22",
@@ -56,6 +62,7 @@ ffmpeg 已经安装并在 PATH 中
 		},
 		{
 			"resolution": "1280x720",
+			"file_ext": ".mp4",
 			"ffargs": [
 				"-c:v", "h264",
 				"-crf", "23",
@@ -76,10 +83,11 @@ ffmpeg 已经安装并在 PATH 中
 * `callback` 任务结束后，模块将向该地址发送一个 HTTP 请求，包含任务的完成状态及错误码，支持 HTTPS
 * `work_dir` 工作目录，程序将在该目录下寻找和生成文件
 * `concurrent` 同时执行的 ffmpeg 进程数量，由于 ffmpeg 自身支持多线程，此值推荐为 1
-* `defaultargs` 默认的 ffmpeg 参数，用于转码超低分辨率或 `modes` 为空时使用
+* `default_mode` 默认的编码模式，配置参考 `modes` 配置，省略字段 `resolution`，此为视频分辨率不满足 `modes` 中的任一但满足转码条件时执行的转码模式
 * `modes` 编码方案，为一个数组
-	* `resolution` 需要编码的分辨率，此分辨率为分辨率限制，实际分辨率会根据视频分辨率调整，但最终的结果分辨率宽高不会超出此限制
-	* `ffargs` 该模式下的 ffmpeg 参数
+	* `resolution` 需要编码的分辨率，此分辨率为分辨率限制，当目标视频宽或者高超出此配置规定时将会激活该配置转码方案，实际分辨率会根据视频分辨率调整，但最终的结果分辨率宽高不会超出此限制
+	* `file_ext` 保存的视频文件后缀名，注意加 `.` ；在参数为指定时，ffmpeg 会根据该值判断输出文件的封装形式
+	* `ffargs` 该模式下的 ffmpeg 参数；视频分辨率参数（`-s:v`）会自动计算并添加
 * `min_res` 最小分辨率限制，当视频宽度或高度不及该值时，会拒绝对该视频转码
 * `asr_max` 最大宽高比，当视频 宽度/高度 大于此值时，会拒绝对该视频的转码
 * `asr_min` 最小宽高比，当视频 宽度/高度 小于此值时，会拒绝对该视频的转码

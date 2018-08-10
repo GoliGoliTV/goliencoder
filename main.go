@@ -80,7 +80,7 @@ type encodeTask struct {
 	Resolution string
 }
 
-func generateTasks(width, height int, modes []encodeMode, inFile string, defaultArgs []string) (ts []encodeTask) {
+func generateTasks(width, height int, modes []encodeMode, inFile string, dm encodeMode) (ts []encodeTask) {
 	for _, m := range modes {
 		tw, th, e := parseResolution(m.Resolution)
 		if e != nil {
@@ -88,13 +88,13 @@ func generateTasks(width, height int, modes []encodeMode, inFile string, default
 		}
 		if width > tw || height > th {
 			rw, rh := calculateResolution(width, height, tw, th)
-			outFile := inFile[:len(inFile)-len(path.Ext(inFile))] + fmt.Sprintf("_%dp.mp4", th)
+			outFile := inFile[:len(inFile)-len(path.Ext(inFile))] + fmt.Sprintf("_%dp", th) + dm.FileExtentionName
 			ts = append(ts, encodeTask{inFile, ffargs(inFile, outFile, rw, rh, m.FFMpegArgs), outFile, m.Resolution})
 		}
 	}
 	if len(ts) == 0 {
-		outFile := inFile[:len(inFile)-len(path.Ext(inFile))] + "_orgi.mp4"
-		ts = append(ts, encodeTask{inFile, ffargs(inFile, outFile, width, height, defaultArgs), outFile, "orgi"})
+		outFile := inFile[:len(inFile)-len(path.Ext(inFile))] + "_default" + dm.FileExtentionName
+		ts = append(ts, encodeTask{inFile, ffargs(inFile, outFile, width, height, dm.FFMpegArgs), outFile, "default"})
 	}
 	return
 }
@@ -193,7 +193,7 @@ func main() {
 		w.Write(resBuffer)
 		if res.Ok {
 			go func(w, h int, v string) {
-				for _, t := range generateTasks(w, h, cfg.Modes, v, cfg.FFArgs) {
+				for _, t := range generateTasks(w, h, cfg.Modes, v, cfg.DefaultMode) {
 					tasks <- t
 				}
 			}(videoWidth, videoHeight, req.Video)
