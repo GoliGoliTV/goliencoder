@@ -12,53 +12,10 @@ import (
 	"path"
 )
 
-// StreamInFile store stream info read from ffprobe
-// Type: Audio|Video|Data
-type StreamInFile struct {
-	Channel string `json:"channel"`
-	Type    string `json:"type"`
-	Codec   string `json:"codec"`
-}
-
-// VideoInfo video information struct
-type VideoInfo struct {
-	Duration   string         `json:"duration,omitempty"`
-	Bitrate    string         `json:"bitrate,omitempty"`
-	Resolution string         `json:"resolution,omitempty"`
-	Streams    []StreamInFile `json:"streams,omitempty"`
-}
-
-// GetAspectRatio calculate aspect ratio fo this video
-func (v *VideoInfo) GetAspectRatio() (ar float32, w int, h int) {
-	w, h, e := parseResolution(v.Resolution)
-	if e != nil {
-		return
-	}
-	if w < 1 || h < 1 {
-		w, h = 0, 0
-		return
-	}
-	ar = float32(w) / float32(h)
-	return
-}
-
-// CheckAspectRatio checks aspect ratio, and the resolution size
-// amin: MinAspectRatio, amax: MaxAspectRatio, wmin: MinWidth, hmin: MinHeight
-func (v *VideoInfo) CheckAspectRatio(amin, amax float32, wmin, hmin int) int {
-	vr, w, h := v.GetAspectRatio()
-	if w < wmin || h < hmin {
-		return 1
-	}
-	if vr < amin || vr > amax {
-		return 2
-	}
-	return 0
-}
-
 type apiResponse struct {
-	Ok        bool      `json:"ok"`
-	ErrorInfo string    `json:"error,omitempty"`
-	Result    VideoInfo `json:"result,omitempty"`
+	Ok        bool       `json:"ok"`
+	ErrorInfo string     `json:"error,omitempty"`
+	Result    videoInfo2 `json:"result,omitempty"`
 }
 
 type apiRequest struct {
@@ -80,7 +37,7 @@ type encodeTask struct {
 	Resolution string
 }
 
-func generateTasks(width, height int, modes []encodeMode, inFile string, dm encodeMode) (ts []encodeTask) {
+func generateTasks(width, height uint, modes []encodeMode, inFile string, dm encodeMode) (ts []encodeTask) {
 	for _, m := range modes {
 		tw, th, e := parseResolution(m.Resolution)
 		if e != nil {
@@ -100,7 +57,7 @@ func generateTasks(width, height int, modes []encodeMode, inFile string, dm enco
 }
 
 func apiErrorResponse(info string) (b []byte) {
-	b, _ = json.Marshal(apiResponse{false, info, VideoInfo{}})
+	b, _ = json.Marshal(apiResponse{false, info, videoInfo2{}})
 	return
 }
 
@@ -170,7 +127,7 @@ func main() {
 			w.Write(apiErrorResponse("can not stat file: " + err.Error()))
 			return
 		}
-		vi, err := probeVideo(path.Join(cfg.WorkingDirectory, req.Video))
+		vi, err := probeVideo2(path.Join(cfg.WorkingDirectory, req.Video))
 		if err != nil {
 			w.Write(apiErrorResponse("err: " + err.Error()))
 			return
@@ -184,7 +141,7 @@ func main() {
 		} else {
 			res.Ok = true
 		}
-		videoWidth, videoHeight, err := parseResolution(vi.Resolution)
+		videoWidth, videoHeight := vi.Videos[0].Width, vi.Videos[0].Height
 		if err != nil {
 			res.Ok = false
 			res.ErrorInfo = "can not parse video resolution, maybe not a video file"
@@ -192,7 +149,7 @@ func main() {
 		resBuffer, _ := json.Marshal(res)
 		w.Write(resBuffer)
 		if res.Ok {
-			go func(w, h int, v string) {
+			go func(w, h uint, v string) {
 				for _, t := range generateTasks(w, h, cfg.Modes, v, cfg.DefaultMode) {
 					tasks <- t
 				}

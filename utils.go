@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -98,7 +97,7 @@ func parseProbeResult(b *[]byte) (pr probeResult, err error) {
 	return
 }
 
-type videoInfoStream struct {
+type channelInfoStream struct {
 	Index      uint8  `json:"index"`
 	Codec      string `josn:"codec"`
 	CodecName  string `json:"codec_name,omitempty"`
@@ -110,22 +109,40 @@ type videoInfoStream struct {
 }
 
 type videoInfo2 struct {
-	StreamNum  uint              `json:"streams_num"`
-	FormatName string            `json:"file_format"`
-	Duration   uint              `json:"duration"`
-	Bitrate    uint              `json:"bit_rate"`
-	MultiVideo bool              `json:"multivideo"`
-	MultiAudio bool              `json:"multiaudio"`
-	Videos     []videoInfoStream `json:"videos"`
-	Audios     []videoInfoStream `json:"audios"`
+	StreamNum  uint                `json:"streams_num"`
+	FormatName string              `json:"file_format"`
+	Duration   uint                `json:"duration"`
+	Bitrate    uint                `json:"bit_rate"`
+	MultiVideo bool                `json:"multivideo"`
+	MultiAudio bool                `json:"multiaudio"`
+	Videos     []channelInfoStream `json:"videos"`
+	Audios     []channelInfoStream `json:"audios"`
+}
+
+func (v *videoInfo2) GetAspectRatio() (ar float32, w, h uint) {
+	w = v.Videos[0].Width
+	h = v.Videos[0].Height
+	ar = float32(w) / float32(h)
+	return
+}
+
+func (v *videoInfo2) CheckAspectRatio(amin, amax float32, wmin, hmin uint) int {
+	vr, w, h := v.GetAspectRatio()
+	if w < wmin || h < hmin {
+		return 1
+	}
+	if vr < amin || vr > amax {
+		return 2
+	}
+	return 0
 }
 
 func probeResult2VideoInfo(pr probeResult) (vi videoInfo2, err error) {
-	var vsa []videoInfoStream
-	var asa []videoInfoStream
+	var vsa []channelInfoStream
+	var asa []channelInfoStream
 	for _, s := range pr.Streams {
 		if s.Type == "audio" {
-			asa = append(asa, videoInfoStream{
+			asa = append(asa, channelInfoStream{
 				Index:      s.Index,
 				Codec:      s.Codec,
 				CodecName:  s.CodecFullName,
@@ -133,7 +150,7 @@ func probeResult2VideoInfo(pr probeResult) (vi videoInfo2, err error) {
 				Channels:   s.Channels,
 			})
 		} else if s.Type == "video" {
-			vsa = append(vsa, videoInfoStream{
+			vsa = append(vsa, channelInfoStream{
 				Index:     s.Index,
 				Codec:     s.Codec,
 				CodecName: s.CodecFullName,
@@ -175,41 +192,7 @@ func probeVideo2(videoPath string) (vi videoInfo2, err error) {
 	return
 }
 
-func probeVideo(videoPath string) (vi VideoInfo, err error) {
-	cmd := exec.Command("ffprobe", "-i", videoPath)
-	reg, _ := regexp.Compile(`^Stream (#\d+:\d+).*: (?:(Audio): (\w+).+?|(Video): (\w+).+?, (\d+x\d+)[, \[])`)
-	probeBuffer, err := cmd.CombinedOutput()
-	if err != nil {
-		return
-	}
-	sl := strings.Split(string(probeBuffer), "\n")
-	for _, s := range sl {
-		data := strings.TrimSpace(s)
-		var da []string
-		if strings.HasPrefix(data, "Duration:") {
-			da = strings.Split(data, ", ")
-			if len(da) != 3 {
-				continue
-			}
-			vi.Duration = da[0][10:]
-			vi.Bitrate = da[2][9:]
-		} else if strings.HasPrefix(data, "Stream #") {
-			mresult := reg.FindStringSubmatch(data)
-			if len(mresult) == 0 {
-				continue
-			}
-			if mresult[2] == "Audio" {
-				vi.Streams = append(vi.Streams, StreamInFile{mresult[1], mresult[2], mresult[3]})
-			} else if mresult[4] == "Video" {
-				vi.Resolution = mresult[6]
-				vi.Streams = append(vi.Streams, StreamInFile{mresult[1], mresult[4], mresult[5]})
-			}
-		}
-	}
-	return
-}
-
-func calculateResolution(ow, oh, tw, th int) (rw, rh int) {
+func calculateResolution(ow, oh, tw, th uint) (rw, rh uint) {
 	if ow <= tw && oh <= th {
 		rw, rh = ow, oh
 		return
@@ -239,7 +222,7 @@ func calculateResolution(ow, oh, tw, th int) (rw, rh int) {
 	return
 }
 
-func parseResolution(r string) (w, h int, err error) {
+func parseResolution(r string) (w, h uint, err error) {
 	sa := strings.Split(r, "x")
 	wi, err := strconv.ParseInt(sa[0], 10, 32)
 	if err != nil {
@@ -249,11 +232,11 @@ func parseResolution(r string) (w, h int, err error) {
 	if err != nil {
 		return
 	}
-	w, h = int(wi), int(he)
+	w, h = uint(wi), uint(he)
 	return
 }
 
-func ffargs(input, output string, rw, rh int, args []string) (fullargs []string) {
+func ffargs(input, output string, rw, rh uint, args []string) (fullargs []string) {
 	fullargs = []string{"-i", input, "-y", "-s:v", fmt.Sprintf("%dx%d", rw, rh)}
 	fullargs = append(fullargs, args...)
 	fullargs = append(fullargs, output)
