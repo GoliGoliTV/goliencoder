@@ -108,19 +108,29 @@ goliencoder -c /path/to/config.json
 {
 	"ok": true,
 	"result": {
-		"duration": "00:13:27.19",
-		"bitrate": "2876 kb/s",
-		"resolution": "1920x1080",
-		"streams": [
+		"streams_num": 2,
+		"file_format": "mov,mp4,m4a,3gp,3g2,mj2; QuickTime / MOV",
+		"duration": 13958,
+		"bit_rate": 404636,
+		"multivideo": false,
+		"multiaudio": false,
+		"videos": [
 			{
-				"channel": "#0:0",
-				"type": "Audio",
-				"codec": "aac"
-			},
+				"index": 0,
+				"codec": "h264",
+				"codec_name":"H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+				"width": 1920,
+				"height": 1080,
+				"framerate": 26
+			}
+		],
+		"audios": [
 			{
-				"channel": "#0:1",
-				"type": "Video",
-				"codec": "h264"
+				"index": 1,
+				"codec": "aac",
+				"codec_name": "AAC (Advanced Audio Coding)",
+				"channels": 2,
+				"samplerate": 44100
 			}
 		]
 	}
@@ -132,19 +142,20 @@ goliencoder -c /path/to/config.json
 	"ok": false,
 	"error": "video resolution is too low",
 	"result": {
-		"duration": "00:05:12.01",
-		"bitrate": "186 kb/s",
-		"resolution": "120x100",
-		"streams": [
+		"streams_num": 1,
+		"file_format": "mov,mp4,m4a,3gp,3g2,mj2; QuickTime / MOV",
+		"duration": 5810,
+		"bit_rate": 40620,
+		"multivideo": false,
+		"multiaudio": false,
+		"videos": [
 			{
-				"channel": "#0:0",
-				"type": "Audio",
-				"codec": "aac"
-			},
-			{
-				"channel": "#0:1",
-				"type": "Video",
-				"codec": "h264"
+				"index": 0,
+				"codec": "h264",
+				"codec_name":"H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+				"width": 100,
+				"height": 80,
+				"framerate": 26
 			}
 		]
 	}

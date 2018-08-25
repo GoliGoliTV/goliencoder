@@ -12,39 +12,50 @@ import (
 type probeStream struct {
 	Index              uint8  `json:"index"`
 	Codec              string `json:"codec_name"`
-	CodecFullName      string `json:"codec_full_name,omitempty"`
+	CodecFullName      string `json:"codec_long_name,omitempty"`
 	Type               string `json:"codec_type"`
 	Width              uint   `json:"width,omitempty"`
 	Height             uint   `json:"height,omitempty"`
-	SampleRate         string `json:"sample_rate,omitempty"`
+	RawSampleRate      string `json:"sample_rate,omitempty"`
 	Channels           uint   `json:"channels,omitempty"`
-	FrameRate          uint   `json:"-"`
 	RawFrameRateString string `json:"r_frame_rate,omitempty"`
+	FrameRate          uint   `json:"-"`
+	SampleRate         uint   `json:"-"`
 }
 
 func (f *probeStream) RefreshFR() (err error) {
-	if f.Type != "video" {
-		return
+	if f.Type == "video" {
+		if f.RawFrameRateString == "" {
+			return
+		}
+		pf := strings.Split(f.RawFrameRateString, "/")
+		if len(pf) != 2 {
+			return
+		}
+		var pa, pb uint64
+		pa, err = strconv.ParseUint(pf[0], 10, 32)
+		if err != nil {
+			return
+		}
+		pb, err = strconv.ParseUint(pf[1], 10, 32)
+		if err != nil {
+			return
+		}
+		if pb == 0 {
+			return
+		}
+		f.FrameRate = uint(pa / pb)
+	} else if f.Type == "audio" {
+		if f.RawSampleRate == "" {
+			return
+		}
+		var ra uint64
+		ra, err = strconv.ParseUint(f.RawSampleRate, 10, 32)
+		if err != nil {
+			return
+		}
+		f.SampleRate = uint(ra)
 	}
-	if f.RawFrameRateString == "" {
-		return
-	}
-	pf := strings.Split(f.RawFrameRateString, "/")
-	if len(pf) != 2 {
-		return
-	}
-	pa, err := strconv.ParseUint(pf[0], 10, 32)
-	if err != nil {
-		return
-	}
-	pb, err := strconv.ParseUint(pf[1], 10, 32)
-	if err != nil {
-		return
-	}
-	if pb == 0 {
-		return
-	}
-	f.FrameRate = uint(pa / pb)
 	return
 }
 
@@ -78,8 +89,9 @@ type probeResult struct {
 }
 
 func (p *probeResult) Init() (err error) {
-	for _, s := range p.Streams {
-		err = s.RefreshFR()
+	sl := len(p.Streams)
+	for i := 0; i < sl; i++ {
+		err = p.Streams[i].RefreshFR()
 		if err != nil {
 			return
 		}
@@ -99,24 +111,24 @@ func parseProbeResult(b *[]byte) (pr probeResult, err error) {
 
 type channelInfoStream struct {
 	Index      uint8  `json:"index"`
-	Codec      string `josn:"codec"`
+	Codec      string `json:"codec"`
 	CodecName  string `json:"codec_name,omitempty"`
 	Width      uint   `json:"width,omitempty"`
 	Height     uint   `json:"height,omitempty"`
-	SampleRate string `json:"sample_rate,omitempty"`
+	SampleRate uint   `json:"samplerate,omitempty"`
 	Channels   uint   `json:"channels,omitempty"`
 	FrameRate  uint   `json:"framerate,omitempty"`
 }
 
 type videoInfo2 struct {
-	StreamNum  uint                `json:"streams_num"`
-	FormatName string              `json:"file_format"`
-	Duration   uint                `json:"duration"`
-	Bitrate    uint                `json:"bit_rate"`
-	MultiVideo bool                `json:"multivideo"`
-	MultiAudio bool                `json:"multiaudio"`
-	Videos     []channelInfoStream `json:"videos"`
-	Audios     []channelInfoStream `json:"audios"`
+	StreamNum  uint                `json:"streams_num,omitempty"`
+	FormatName string              `json:"file_format,omitempty"`
+	Duration   uint                `json:"duration,omitempty"`
+	Bitrate    uint                `json:"bit_rate,omitempty"`
+	MultiVideo bool                `json:"multivideo,omitempty"`
+	MultiAudio bool                `json:"multiaudio,omitempty"`
+	Videos     []channelInfoStream `json:"videos,omitempty"`
+	Audios     []channelInfoStream `json:"audios,omitempty"`
 }
 
 func (v *videoInfo2) GetAspectRatio() (ar float32, w, h uint) {
