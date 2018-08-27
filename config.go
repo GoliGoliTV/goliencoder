@@ -6,8 +6,9 @@ import (
 )
 
 type encodeMode struct {
-	Resolution string   `json:"resolution"`
-	FFMpegArgs []string `json:"ffargs"`
+	Resolution        string   `json:"resolution,omitempty"`
+	FileExtentionName string   `json:"file_ext,omitempty"`
+	FFMpegArgs        []string `json:"ffargs"`
 }
 
 type config struct {
@@ -15,7 +16,7 @@ type config struct {
 	CallbackURL      string       `json:"callback"`
 	WorkingDirectory string       `json:"work_dir"`
 	Cuncurrent       int          `json:"concurrent"`
-	FFArgs           []string     `json:"defaultargs"`
+	DefaultMode      encodeMode   `json:"default_mode"`
 	Modes            []encodeMode `json:"modes"`
 	MinResolution    string       `json:"min_res"`
 	MaxAspectRatio   float32      `json:"asr_max"`
@@ -30,6 +31,14 @@ func loadConfigJSON(file string) (c config, err error) {
 	err = json.Unmarshal(jb, &c)
 	if err != nil {
 		return
+	}
+	if c.DefaultMode.FileExtentionName == "" {
+		c.DefaultMode.FileExtentionName = ".mp4"
+	}
+	for _, mode := range c.Modes {
+		if mode.FileExtentionName == "" {
+			mode.FileExtentionName = ".mp4"
+		}
 	}
 	return
 }
