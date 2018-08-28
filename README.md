@@ -206,5 +206,5 @@ goliencoder -c /path/to/config.json
 
 #### 转码任务生成文件名规律
 
-1. 当生成 `resolution` 存在于配置文件中时：原文件名去掉后缀名 + `_` + 编码 `resolution` 的 `height` + `p.mp4`
-1. 当生成 `resolution` 不存在配置文件中时（通常见于分辨率低于配置转码分辨率中的最低版本）：原文件名去掉后缀名 + `_orgi.mp4`
+1. 当生成 `resolution` 存在于配置文件中时：原文件名去掉后缀名 + `_` + 编码 `resolution` 的 `height` + `p` + 自定义后缀
+1. 当生成 `resolution` 不存在配置文件中时（通常见于分辨率低于配置转码分辨率中的最低版本）：原文件名去掉后缀名 + `_default` + 自定义后缀
