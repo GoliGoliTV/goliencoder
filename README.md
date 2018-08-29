@@ -95,13 +95,14 @@ goliencoder -c /path/to/config.json
 ### API
 
 以HTTP方式向监听地址发送数据，路径 `/`，方式 `POST`
-
-发送请求，请求参数 `video`，程序将在工作目录找到该文件并尝试转码
 ```json
 {
-	"video": "2018/031922/MDIAO67EOP.mp4"
+	"video": "2018/031922/MDIAO67EOP.mp4",
+	"noconvert": false
 }
 ```
+* `video` 视频文件路径（相对于设置中的 `work_dir` 路径），程序将在工作目录找到该文件并尝试转码。
+* `noconvert` 仅返回信息，不进行视频转码。默认 `false`。
 
 响应任务请求状态及文件详情：
 ```json

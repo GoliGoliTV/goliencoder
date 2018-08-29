@@ -19,7 +19,8 @@ type apiResponse struct {
 }
 
 type apiRequest struct {
-	Video string `json:"video"`
+	Video     string `json:"video"`
+	NoConvert bool   `json:"noconvert,omitempty"`
 }
 
 type callbackRequest struct {
@@ -148,6 +149,9 @@ func main() {
 		}
 		resBuffer, _ := json.Marshal(res)
 		w.Write(resBuffer)
+		if req.NoConvert {
+			return
+		}
 		if res.Ok {
 			go func(w, h uint, v string) {
 				for _, t := range generateTasks(w, h, cfg.Modes, v, cfg.DefaultMode) {
